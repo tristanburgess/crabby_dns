@@ -1,5 +1,8 @@
-use std::fs::File;
-use std::io::prelude::*;
+#[macro_use]
+extern crate clap;
+use clap::{App, AppSettings};
+
+use std::process;
 
 use rusty_dns_server::buffer::BytePacketBuffer;
 
@@ -17,10 +20,9 @@ fn read_qname() {
     unimplemented!();
 }
 
-fn main() -> std::io::Result<()> {
-    let mut f = File::open("response_packet.txt")?;
+fn parse_response_packet_file(file_path: &str) -> std::io::Result<()> {
     let mut b = BytePacketBuffer::new();
-    //f.read(&mut b.buf)?;
+    b.fill_from_file(file_path)?;
 
     /*let packet = DnsPacket::from_buffer(&mut b)?;
     println!("{:#?}", packet.header);
@@ -36,6 +38,23 @@ fn main() -> std::io::Result<()> {
     for adtl in packet.additionals {
         println!("{:#?}", adtl);
     }*/
+
+    Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+    let yaml = load_yaml!("../config/cli.yml");
+    let matches = App::from_yaml(yaml)
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .get_matches();
+
+    if let Some(stub) = matches.subcommand_matches("stub") {
+        let path = stub.value_of("packet-file").unwrap();
+        if let Err(e) = parse_response_packet_file(path) {
+            eprintln!("Application error: {}", e);
+            process::exit(2);
+        }
+    }
 
     Ok(())
 }

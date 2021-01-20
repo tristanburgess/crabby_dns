@@ -1,0 +1,15 @@
+name: rusty_dns_server
+version: "0.1.0"
+author: Tristan Burgess <tburgessdev@gmail.com>
+about: Is a rusty DNS server
+subcommands:
+    - stub:
+        about: a simple DNS stub resolver. Can either forward DNS queries to a DNS server and parse + print the response, or read DNS packet data in binary encoded format from a file and parse + print the decoded DNS data.
+        version: "0.1.0"
+        author: Tristan Burgess <tburgessdev@gmail.com>
+        args:
+            - packet-file:
+                help: Path to a binary file containing DNS packet data.
+                long: packet-file
+                required: true
+                short: f
