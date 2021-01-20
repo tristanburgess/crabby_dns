@@ -87,6 +87,7 @@ impl BytePacketBuffer {
 
     /// Returns the u16 in the buffer at the cursor position if the read won't overrun.
     /// Increments the cursor by two.
+    /// Parses in network byte order (big endian).
     pub fn pop_u16(&mut self) -> Result<u16> {
         let res = ((self.pop()? as u16) << 8) | (self.pop()? as u16);
 
@@ -95,6 +96,7 @@ impl BytePacketBuffer {
 
     /// Returns the u32 in the buffer at the cursor position if the read won't overrun.
     /// Increments the cursor by four.
+    /// Parses in network byte order (big endian).
     pub fn pop_u32(&mut self) -> Result<u32> {
         let res = ((self.pop()? as u32) << 24)
             | ((self.pop()? as u32) << 16)
