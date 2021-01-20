@@ -6,36 +6,22 @@ use std::process;
 
 use rusty_dns_server::buffer::BytePacketBuffer;
 
-/*struct DnsPacket {
-    header: DnsHeader,
-    questions: Vec<DnsQuestion>,
-    answers: Vec<DnsRecord>,
-    authorities: Vec<DnsRecord>,
-    additionals: Vec<DnsRecord>,
-}
-*/
-
-// NOTE(tristan), must account for DNS labels as well as jumps
-fn read_qname() {
-    unimplemented!();
-}
-
 fn parse_response_packet_file(file_path: &str) -> std::io::Result<()> {
     let mut b = BytePacketBuffer::new();
     b.fill_from_file(file_path)?;
 
-    /*let packet = DnsPacket::from_buffer(&mut b)?;
-    println!("{:#?}", packet.header);
-    for q in packet.questions {
+    /*let message = DnsMessage::from_buffer(&mut b)?;
+    println!("{:#?}", message.header);
+    for q in message.questions {
         println!("{:#?}", q);
     }
-    for a in packet.answers {
+    for a in message.answers {
         println!("{:#?}", a);
     }
-    for auth in packet.authorities {
+    for auth in message.authorities {
         println!("{:#?}", auth);
     }
-    for adtl in packet.additionals {
+    for adtl in message.additionals {
         println!("{:#?}", adtl);
     }*/
 
