@@ -2,7 +2,7 @@ use std::net::Ipv4Addr;
 
 use crate::buffer::{BytePacketBuffer, Result};
 
-/// Representation of a DNS message
+/// Representation of a DNS message.
 ///
 /// [RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
 ///
