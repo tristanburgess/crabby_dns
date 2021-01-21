@@ -4,14 +4,14 @@ use clap::{App, AppSettings};
 
 use std::process;
 
-use rusty_dns_server::buffer::{BytePacketBuffer, Result};
+use rusty_dns_server::buffer::{BytePacketBuffer, Deserialize, Result};
 use rusty_dns_server::dns::Message;
 
 fn parse_response_packet_file(file_path: &str) -> Result<()> {
-    let mut b = BytePacketBuffer::new();
-    b.fill_from_file(file_path)?;
+    let mut buf = BytePacketBuffer::new();
+    buf.fill_from_file(file_path)?;
 
-    let message = Message::deserialize(&mut b)?;
+    let message = Message::deserialize(&mut buf)?;
     println!("{:#?}", message.header);
     for q in message.questions {
         println!("{:#?}", q);

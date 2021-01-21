@@ -18,6 +18,13 @@ impl From<std::io::Error> for BufferError {
 
 pub type Result<T> = std::result::Result<T, BufferError>;
 
+pub trait Deserialize {
+    type Buffer;
+    type Structure;
+
+    fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure>;
+}
+
 pub struct BytePacketBuffer {
     buf: [u8; BUF_SIZE],
     pos: usize,

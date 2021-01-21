@@ -2,6 +2,46 @@ use std::net::Ipv4Addr;
 
 use crate::buffer::{BytePacketBuffer, Result};
 
+/// Representation of a DNS message
+///
+/// [RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
+///
+/// ```text
+/// 4.1. Format
+///
+/// All communications inside of the domain protocol are carried in a single
+/// format called a message.  The top level format of message is divided
+/// into 5 sections (some of which are empty in certain cases) shown below:
+///
+///     +---------------------+
+///     |        Header       |
+///     +---------------------+
+///     |       Question      | the question for the name server
+///     +---------------------+
+///     |        Answer       | RRs answering the question
+///     +---------------------+
+///     |      Authority      | RRs pointing toward an authority
+///     +---------------------+
+///     |      Additional     | RRs holding additional information
+///     +---------------------+
+///
+/// The header section is always present.  The header includes fields that
+/// specify which of the remaining sections are present, and also specify
+/// whether the message is a query or a response, a standard query or some
+/// other opcode, etc.
+///
+/// The names of the sections after the header are derived from their use in
+/// standard queries.  The question section contains fields that describe a
+/// question to a name server.  These fields are a query type (QTYPE), a
+/// query class (QCLASS), and a query domain name (QNAME).  The last three
+/// sections have the same format: a possibly empty list of concatenated
+/// resource records (RRs).  The answer section contains RRs that answer the
+/// question; the authority section contains RRs that point toward an
+/// authoritative name server; the additional records section contains RRs
+/// which relate to the query, but are not strictly answers for the
+/// question.
+/// ```
+
 #[derive(Debug)]
 pub struct Message {
     pub header: Header,
@@ -21,33 +61,26 @@ impl Message {
             additionals: Vec::new(),
         }
     }
+}
 
-    pub fn deserialize(buf: &mut BytePacketBuffer) -> Result<Message> {
+impl crate::buffer::Deserialize for Message {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
         let mut msg = Message::new();
-        msg.header.deserialize(buf)?;
+        msg.header = Header::deserialize(buf)?;
         for _ in 0..msg.header.question_count {
-            let mut question = Question::new(
-                DomainName::new(),
-                QueryType::Unknown(0),
-                QueryClass::Unknown(0),
-            );
-            question.deserialize(buf)?;
-            msg.questions.push(question);
+            msg.questions.push(Question::deserialize(buf)?);
         }
         for _ in 0..msg.header.answer_count {
-            let mut answer = ResourceRecord::new();
-            answer.deserialize(buf)?;
-            msg.answers.push(answer);
+            msg.answers.push(ResourceRecord::deserialize(buf)?);
         }
         for _ in 0..msg.header.authority_count {
-            let mut authority = ResourceRecord::new();
-            authority.deserialize(buf)?;
-            msg.authorities.push(authority);
+            msg.authorities.push(ResourceRecord::deserialize(buf)?);
         }
         for _ in 0..msg.header.additional_count {
-            let mut additional = ResourceRecord::new();
-            additional.deserialize(buf)?;
-            msg.additionals.push(additional);
+            msg.additionals.push(ResourceRecord::deserialize(buf)?);
         }
         Ok(msg)
     }
@@ -148,27 +181,33 @@ impl Header {
             additional_count: 0,
         }
     }
+}
 
-    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
-        self.id = buf.pop_u16()?;
+impl crate::buffer::Deserialize for Header {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
+        let mut hdr = Header::new();
+        hdr.id = buf.pop_u16()?;
 
         let flags = buf.pop_u16()?;
-        self.message_type = ((flags & (0x1 << 15)) != 0).into();
-        self.op_code = ((flags & (0xF << 11)) as u8).into();
-        self.authoritative_answer = (flags & (0x1 << 10)) != 0;
-        self.truncation = (flags & (0x1 << 9)) != 0;
-        self.recursion_desired = (flags & (0x1 << 8)) != 0;
-        self.recursion_available = (flags & (0x1 << 7)) != 0;
-        self.authentic_data = (flags & (0x1 << 5)) != 0;
-        self.checking_disabled = (flags & (0x1 << 4)) != 0;
-        self.response_code = ((flags & 0xF) as u8).into();
+        hdr.message_type = ((flags & (0x1 << 15)) != 0).into();
+        hdr.op_code = ((flags & (0xF << 11)) as u8).into();
+        hdr.authoritative_answer = (flags & (0x1 << 10)) != 0;
+        hdr.truncation = (flags & (0x1 << 9)) != 0;
+        hdr.recursion_desired = (flags & (0x1 << 8)) != 0;
+        hdr.recursion_available = (flags & (0x1 << 7)) != 0;
+        hdr.authentic_data = (flags & (0x1 << 5)) != 0;
+        hdr.checking_disabled = (flags & (0x1 << 4)) != 0;
+        hdr.response_code = ((flags & 0xF) as u8).into();
 
-        self.question_count = buf.pop_u16()?;
-        self.answer_count = buf.pop_u16()?;
-        self.authority_count = buf.pop_u16()?;
-        self.additional_count = buf.pop_u16()?;
+        hdr.question_count = buf.pop_u16()?;
+        hdr.answer_count = buf.pop_u16()?;
+        hdr.authority_count = buf.pop_u16()?;
+        hdr.additional_count = buf.pop_u16()?;
 
-        Ok(())
+        Ok(hdr)
     }
 }
 
@@ -279,10 +318,15 @@ impl DomainName {
     pub fn new() -> DomainName {
         DomainName(String::new())
     }
+}
 
-    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
+impl crate::buffer::Deserialize for DomainName {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
+        let mut dn = DomainName::new();
         let mut jump_count: usize = 0;
-
         let starting_pos = buf.pos();
 
         loop {
@@ -302,11 +346,10 @@ impl DomainName {
                 buf.seek(new_pos as usize);
             } else {
                 let label = buf.peek_range(buf.pos(), len as usize)?;
-                self.0
-                    .push_str(&String::from_utf8_lossy(label).to_lowercase());
+                dn.0.push_str(&String::from_utf8_lossy(label).to_lowercase());
                 buf.step(len as usize);
                 if buf.peek()? != 0 {
-                    self.0.push('.');
+                    dn.0.push('.');
                 }
             }
         }
@@ -315,7 +358,7 @@ impl DomainName {
             buf.seek(starting_pos + 2);
         }
 
-        Ok(())
+        Ok(dn)
     }
 }
 
@@ -326,14 +369,14 @@ impl DomainName {
 /// ```text
 /// 4.1.2. Question section format
 ///
-/// The question section contains the following fields for a total of 6 bytes.
+/// The question section contains the following fields.
 ///
 ///                                    1  1  1  1  1  1
 ///      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5 (bit)
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 ///     |                                               |
-///     |                     QNAME                     |
-///     |                                               |
+///     /                     QNAME                     /
+///     /                                               /
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 ///     |                     QTYPE                     |
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
@@ -356,13 +399,17 @@ impl Question {
             qclass,
         }
     }
+}
 
-    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
-        self.domain_name = DomainName::new();
-        self.domain_name.deserialize(buf)?;
-        self.qtype = buf.pop_u16()?.into();
-        self.qclass = buf.pop_u16()?.into();
-        Ok(())
+impl crate::buffer::Deserialize for Question {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
+        let dn = DomainName::deserialize(buf)?;
+        let qtype = buf.pop_u16()?.into();
+        let qclass = buf.pop_u16()?.into();
+        Ok(Question::new(dn, qtype, qclass))
     }
 }
 
@@ -429,14 +476,14 @@ impl From<QueryClass> for u16 {
 /// ```text
 /// 4.1.3. Resource record format
 ///
-/// A resource record has the following fields for a total of 12 bytes.
+/// A resource record has the following fields.
+///
 ///                                    1  1  1  1  1  1
 ///      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5 (bit)
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 ///     |                                               |
-///     |                                               |
-///     |                      NAME                     |
-///     |                                               |
+///     /                      NAME                     /
+///     /                                               /
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 ///     |                      TYPE                     |
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
@@ -447,9 +494,11 @@ impl From<QueryClass> for u16 {
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 ///     |                   RDLENGTH                    |
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
-///     |                     RDATA                     |
 ///     |                                               |
+///     /                     RDATA                     /
+///     /                                               /
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+/// ```
 
 #[derive(Debug)]
 pub struct ResourceRecord {
@@ -472,16 +521,21 @@ impl ResourceRecord {
             rrdata: RRData::Unknown(0),
         }
     }
+}
 
-    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
-        self.domain_name = DomainName::new();
-        self.domain_name.deserialize(buf)?;
-        self.rrtype = buf.pop_u16()?.into();
-        self.rrclass = buf.pop_u16()?.into();
-        self.ttl = buf.pop_u32()?;
-        self.rrdata_len = buf.pop_u16()?;
+impl crate::buffer::Deserialize for ResourceRecord {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
 
-        self.rrdata = match self.rrtype {
+    fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
+        let mut rr = ResourceRecord::new();
+        rr.domain_name = DomainName::deserialize(buf)?;
+        rr.rrtype = buf.pop_u16()?.into();
+        rr.rrclass = buf.pop_u16()?.into();
+        rr.ttl = buf.pop_u32()?;
+        rr.rrdata_len = buf.pop_u16()?;
+
+        rr.rrdata = match rr.rrtype {
             RRType::A => {
                 let octets = buf.pop_u32()?;
                 let ip = Ipv4Addr::new(
@@ -492,10 +546,10 @@ impl ResourceRecord {
                 );
                 RRData::A(ip)
             }
-            RRType::Unknown(inner_val) => RRData::Unknown(inner_val),
+            RRType::Unknown(_) => RRData::Unknown(rr.rrdata_len),
         };
 
-        Ok(())
+        Ok(rr)
     }
 }
 
@@ -549,8 +603,31 @@ impl From<RRClass> for u16 {
 
 #[derive(Debug)]
 pub enum RRData {
+    /// [RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
+    ///
+    /// ```text
+    ///     3.4.1. A RDATA format
+    ///
+    ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    ///     |                    ADDRESS                    |
+    ///     |                                               |
+    ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    ///
+    /// where:
+    ///
+    /// ADDRESS         A 32 bit Internet address.
+    ///
+    /// Hosts that have multiple Internet addresses will have multiple A
+    /// records.
+    ///
+    /// A records cause no additional section processing.  The RDATA section of
+    /// an A line in a master file is an Internet address expressed as four
+    /// decimal numbers separated by dots without any imbedded spaces (e.g.,
+    /// "10.2.0.52" or "192.0.5.6").
+    /// ```
     A(Ipv4Addr),
-    // NOTE(tristan): Unknown RRData will only consist of the length of the data
-    // associated with the unknown-typed record.
+
+    /// Unknown RRData will only consist of the length of the data
+    /// associated with the unknown-typed resource record.
     Unknown(u16),
 }
