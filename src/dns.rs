@@ -26,8 +26,11 @@ impl Message {
         let mut msg = Message::new();
         msg.header.deserialize(buf)?;
         for _ in 0..msg.header.question_count {
-            let mut question =
-                Question::new(String::new(), QueryType::Unknown(0), QueryClass::Unknown(0));
+            let mut question = Question::new(
+                DomainName::new(),
+                QueryType::Unknown(0),
+                QueryClass::Unknown(0),
+            );
             question.deserialize(buf)?;
             msg.questions.push(question);
         }
@@ -150,15 +153,15 @@ impl Header {
         self.id = buf.pop_u16()?;
 
         let flags = buf.pop_u16()?;
-        self.message_type = ((flags & 0x1) == 1).into();
-        self.op_code = ((flags & (0xF << 1)) as u8).into();
-        self.authoritative_answer = (flags & (0x1 << 5)) == 1;
-        self.truncation = (flags & (0x1 << 6)) == 1;
-        self.recursion_desired = (flags & (0x1 << 7)) == 1;
-        self.recursion_available = (flags & (0x1 << 8)) == 1;
-        self.authentic_data = (flags & (0x1 << 10)) == 1;
-        self.checking_disabled = (flags & (0x1 << 11)) == 1;
-        self.response_code = ((flags & (0xF << 12)) as u8).into();
+        self.message_type = ((flags & (0x1 << 15)) != 0).into();
+        self.op_code = ((flags & (0xF << 11)) as u8).into();
+        self.authoritative_answer = (flags & (0x1 << 10)) != 0;
+        self.truncation = (flags & (0x1 << 9)) != 0;
+        self.recursion_desired = (flags & (0x1 << 8)) != 0;
+        self.recursion_available = (flags & (0x1 << 7)) != 0;
+        self.authentic_data = (flags & (0x1 << 5)) != 0;
+        self.checking_disabled = (flags & (0x1 << 4)) != 0;
+        self.response_code = ((flags & 0xF) as u8).into();
 
         self.question_count = buf.pop_u16()?;
         self.answer_count = buf.pop_u16()?;
@@ -232,6 +235,90 @@ impl From<ResponseCode> for u8 {
     }
 }
 
+/// Representation of a DNS domain name
+///
+/// [RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
+/// ```text
+/// 4.1.4. Message Compression
+///
+/// In order to reduce the size of messages, the domain system utilizes a
+/// compression scheme which eliminates the repetition of domain names in a
+/// message.  In this scheme, an entire domain name or a list of labels at
+/// the end of a domain name is replaced with a pointer to a prior occurence
+/// of the same name.
+///
+/// The pointer takes the form of a two octet sequence:
+///
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     | 1  1|                OFFSET                   |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///
+/// The first two bits are ones.  This allows a pointer to be distinguished
+/// from a label, since the label must begin with two zero bits because
+/// labels are restricted to 63 octets or less.  (The 10 and 01 combinations
+/// are reserved for future use.)  The OFFSET field specifies an offset from
+/// the start of the message (i.e., the first octet of the ID field in the
+/// domain header).  A zero offset specifies the first byte of the ID field,
+/// etc.
+///
+/// The compression scheme allows a domain name in a message to be
+/// represented as either:
+///
+///    - a sequence of labels ending in a zero octet
+///
+///    - a pointer
+///
+///    - a sequence of labels ending with a pointer
+/// ```
+#[derive(Debug)]
+pub struct DomainName(String);
+
+impl DomainName {
+    const DSER_MAX_JUMPS: usize = 5;
+
+    pub fn new() -> DomainName {
+        DomainName(String::new())
+    }
+
+    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
+        let mut jump_count: usize = 0;
+
+        let starting_pos = buf.pos();
+
+        loop {
+            let len = buf.pop()?;
+
+            if len == 0 {
+                break;
+            }
+
+            if (len & 0xC0) == 0xC0 {
+                jump_count += 1;
+                if jump_count > Self::DSER_MAX_JUMPS {
+                    // TODO(tristan) how is this error handled?
+                    todo!();
+                }
+                let new_pos: u16 = ((len as u16) << 8 | buf.pop()? as u16) ^ 0xC000;
+                buf.seek(new_pos as usize);
+            } else {
+                let label = buf.peek_range(buf.pos(), len as usize)?;
+                self.0
+                    .push_str(&String::from_utf8_lossy(label).to_lowercase());
+                buf.step(len as usize);
+                if buf.peek()? != 0 {
+                    self.0.push('.');
+                }
+            }
+        }
+
+        if jump_count > 0 {
+            buf.seek(starting_pos + 2);
+        }
+
+        Ok(())
+    }
+}
+
 /// Representation of a DNS message question.
 ///
 /// [RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
@@ -256,13 +343,13 @@ impl From<ResponseCode> for u8 {
 
 #[derive(Debug)]
 pub struct Question {
-    domain_name: String,
+    domain_name: DomainName,
     qtype: QueryType,
     qclass: QueryClass,
 }
 
 impl Question {
-    pub fn new(domain_name: String, qtype: QueryType, qclass: QueryClass) -> Question {
+    pub fn new(domain_name: DomainName, qtype: QueryType, qclass: QueryClass) -> Question {
         Question {
             domain_name,
             qtype,
@@ -271,13 +358,10 @@ impl Question {
     }
 
     pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
-        self.deserialize_domain_name()?;
+        self.domain_name = DomainName::new();
+        self.domain_name.deserialize(buf)?;
         self.qtype = buf.pop_u16()?.into();
         self.qclass = buf.pop_u16()?.into();
-        Ok(())
-    }
-
-    fn deserialize_domain_name(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -369,7 +453,7 @@ impl From<QueryClass> for u16 {
 
 #[derive(Debug)]
 pub struct ResourceRecord {
-    domain_name: String,
+    domain_name: DomainName,
     rrtype: RRType,
     rrclass: RRClass,
     ttl: u32,
@@ -380,7 +464,7 @@ pub struct ResourceRecord {
 impl ResourceRecord {
     pub fn new() -> ResourceRecord {
         ResourceRecord {
-            domain_name: String::new(),
+            domain_name: DomainName::new(),
             rrtype: RRType::Unknown(0),
             rrclass: RRClass::Unknown(0),
             ttl: 0,
@@ -390,7 +474,8 @@ impl ResourceRecord {
     }
 
     pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
-        self.deserialize_domain_name()?;
+        self.domain_name = DomainName::new();
+        self.domain_name.deserialize(buf)?;
         self.rrtype = buf.pop_u16()?.into();
         self.rrclass = buf.pop_u16()?.into();
         self.ttl = buf.pop_u32()?;
@@ -400,9 +485,9 @@ impl ResourceRecord {
             RRType::A => {
                 let octets = buf.pop_u32()?;
                 let ip = Ipv4Addr::new(
-                    (octets & (0xFF << 24)) as u8,
-                    (octets & (0xFF << 16)) as u8,
-                    (octets & (0xFF << 8)) as u8,
+                    ((octets >> 24) & 0xFF) as u8,
+                    ((octets >> 16) & 0xFF) as u8,
+                    ((octets >> 8) & 0xFF) as u8,
                     (octets & 0xFF) as u8,
                 );
                 RRData::A(ip)
@@ -410,10 +495,6 @@ impl ResourceRecord {
             RRType::Unknown(inner_val) => RRData::Unknown(inner_val),
         };
 
-        Ok(())
-    }
-
-    fn deserialize_domain_name(&mut self) -> Result<()> {
         Ok(())
     }
 }
