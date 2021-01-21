@@ -13,3 +13,5 @@ subcommands:
                 long: packet-file
                 required: true
                 short: f
+                takes_value: true
+                value_name: FILE

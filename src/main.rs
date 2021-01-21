@@ -4,13 +4,14 @@ use clap::{App, AppSettings};
 
 use std::process;
 
-use rusty_dns_server::buffer::BytePacketBuffer;
+use rusty_dns_server::buffer::{BytePacketBuffer, Result};
+use rusty_dns_server::dns::Message;
 
-fn parse_response_packet_file(file_path: &str) -> std::io::Result<()> {
+fn parse_response_packet_file(file_path: &str) -> Result<()> {
     let mut b = BytePacketBuffer::new();
     b.fill_from_file(file_path)?;
 
-    /*let message = DnsMessage::from_buffer(&mut b)?;
+    let message = Message::deserialize(&mut b)?;
     println!("{:#?}", message.header);
     for q in message.questions {
         println!("{:#?}", q);
@@ -23,12 +24,12 @@ fn parse_response_packet_file(file_path: &str) -> std::io::Result<()> {
     }
     for adtl in message.additionals {
         println!("{:#?}", adtl);
-    }*/
+    }
 
     Ok(())
 }
 
-fn main() -> std::io::Result<()> {
+fn main() {
     let yaml = load_yaml!("../config/cli.yml");
     let matches = App::from_yaml(yaml)
         .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -37,10 +38,8 @@ fn main() -> std::io::Result<()> {
     if let Some(stub) = matches.subcommand_matches("stub") {
         let path = stub.value_of("packet-file").unwrap();
         if let Err(e) = parse_response_packet_file(path) {
-            eprintln!("Application error: {}", e);
+            eprintln!("Application error: {:#?}", e);
             process::exit(2);
         }
     }
-
-    Ok(())
 }

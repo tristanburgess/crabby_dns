@@ -1,11 +1,77 @@
 use std::net::Ipv4Addr;
 
+use crate::buffer::{BytePacketBuffer, Result};
+
+#[derive(Debug)]
 pub struct Message {
-    header: Header,
-    questions: Vec<Question>,
-    answers: Vec<ResourceRecord>,
-    authorities: Vec<ResourceRecord>,
-    additionals: Vec<ResourceRecord>,
+    pub header: Header,
+    pub questions: Vec<Question>,
+    pub answers: Vec<ResourceRecord>,
+    pub authorities: Vec<ResourceRecord>,
+    pub additionals: Vec<ResourceRecord>,
+}
+
+impl Message {
+    pub fn new() -> Message {
+        Message {
+            header: Header::new(),
+            questions: Vec::new(),
+            answers: Vec::new(),
+            authorities: Vec::new(),
+            additionals: Vec::new(),
+        }
+    }
+
+    pub fn deserialize(buf: &mut BytePacketBuffer) -> Result<Message> {
+        let mut msg = Message::new();
+        msg.header.deserialize(buf)?;
+        for _ in 0..msg.header.question_count {
+            let mut question =
+                Question::new(String::new(), QueryType::Unknown(0), QueryClass::Unknown(0));
+            question.deserialize(buf)?;
+            msg.questions.push(question);
+        }
+        for _ in 0..msg.header.answer_count {
+            let mut answer = ResourceRecord::new();
+            answer.deserialize(buf)?;
+            msg.answers.push(answer);
+        }
+        for _ in 0..msg.header.authority_count {
+            let mut authority = ResourceRecord::new();
+            authority.deserialize(buf)?;
+            msg.authorities.push(authority);
+        }
+        for _ in 0..msg.header.additional_count {
+            let mut additional = ResourceRecord::new();
+            additional.deserialize(buf)?;
+            msg.additionals.push(additional);
+        }
+        Ok(msg)
+    }
+}
+
+#[derive(Debug)]
+pub enum MessageType {
+    Query,
+    Response,
+}
+
+impl From<bool> for MessageType {
+    fn from(val: bool) -> Self {
+        match val {
+            false => MessageType::Query,
+            true => MessageType::Response,
+        }
+    }
+}
+
+impl From<MessageType> for bool {
+    fn from(val: MessageType) -> Self {
+        match val {
+            MessageType::Query => false,
+            MessageType::Response => true,
+        }
+    }
 }
 
 /// Representation of a DNS message header.
@@ -41,7 +107,8 @@ pub struct Message {
 ///                 and responses.
 /// ...
 /// ```
-///
+
+#[derive(Debug)]
 pub struct Header {
     id: u16,
     message_type: MessageType,
@@ -53,12 +120,56 @@ pub struct Header {
     authentic_data: bool,
     checking_disabled: bool,
     response_code: ResponseCode,
-    query_count: u16,
+    question_count: u16,
     answer_count: u16,
     authority_count: u16,
     additional_count: u16,
 }
 
+impl Header {
+    pub fn new() -> Header {
+        Header {
+            id: 0,
+            message_type: MessageType::Query,
+            op_code: OpCode::Query,
+            authoritative_answer: false,
+            truncation: false,
+            recursion_desired: false,
+            recursion_available: false,
+            authentic_data: false,
+            checking_disabled: false,
+            response_code: ResponseCode::NoError,
+            question_count: 0,
+            answer_count: 0,
+            authority_count: 0,
+            additional_count: 0,
+        }
+    }
+
+    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
+        self.id = buf.pop_u16()?;
+
+        let flags = buf.pop_u16()?;
+        self.message_type = ((flags & 0x1) == 1).into();
+        self.op_code = ((flags & (0xF << 1)) as u8).into();
+        self.authoritative_answer = (flags & (0x1 << 5)) == 1;
+        self.truncation = (flags & (0x1 << 6)) == 1;
+        self.recursion_desired = (flags & (0x1 << 7)) == 1;
+        self.recursion_available = (flags & (0x1 << 8)) == 1;
+        self.authentic_data = (flags & (0x1 << 10)) == 1;
+        self.checking_disabled = (flags & (0x1 << 11)) == 1;
+        self.response_code = ((flags & (0xF << 12)) as u8).into();
+
+        self.question_count = buf.pop_u16()?;
+        self.answer_count = buf.pop_u16()?;
+        self.authority_count = buf.pop_u16()?;
+        self.additional_count = buf.pop_u16()?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub enum OpCode {
     Query,
     Unknown(u8),
@@ -82,11 +193,7 @@ impl From<OpCode> for u8 {
     }
 }
 
-pub enum MessageType {
-    Query,
-    Response,
-}
-
+#[derive(Debug)]
 pub enum ResponseCode {
     NoError,
     FormError,
@@ -146,13 +253,36 @@ impl From<ResponseCode> for u8 {
 ///     |                     QCLASS                    |
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 /// ```
-///
+
+#[derive(Debug)]
 pub struct Question {
     domain_name: String,
     qtype: QueryType,
     qclass: QueryClass,
 }
 
+impl Question {
+    pub fn new(domain_name: String, qtype: QueryType, qclass: QueryClass) -> Question {
+        Question {
+            domain_name,
+            qtype,
+            qclass,
+        }
+    }
+
+    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
+        self.deserialize_domain_name()?;
+        self.qtype = buf.pop_u16()?.into();
+        self.qclass = buf.pop_u16()?.into();
+        Ok(())
+    }
+
+    fn deserialize_domain_name(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub enum QueryType {
     RRType(RRType),
     Unknown(u16),
@@ -180,6 +310,7 @@ impl From<QueryType> for u16 {
     }
 }
 
+#[derive(Debug)]
 pub enum QueryClass {
     RRClass(RRClass),
     Unknown(u16),
@@ -235,6 +366,8 @@ impl From<QueryClass> for u16 {
 ///     |                     RDATA                     |
 ///     |                                               |
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+#[derive(Debug)]
 pub struct ResourceRecord {
     domain_name: String,
     rrtype: RRType,
@@ -244,13 +377,48 @@ pub struct ResourceRecord {
     rrdata: RRData,
 }
 
-pub enum RRData {
-    A(Ipv4Addr),
-    // NOTE(tristan): Unknown RRData will only consist of the length of the data
-    // associated with the unknown-typed record.
-    Unknown(u16),
+impl ResourceRecord {
+    pub fn new() -> ResourceRecord {
+        ResourceRecord {
+            domain_name: String::new(),
+            rrtype: RRType::Unknown(0),
+            rrclass: RRClass::Unknown(0),
+            ttl: 0,
+            rrdata_len: 0,
+            rrdata: RRData::Unknown(0),
+        }
+    }
+
+    pub fn deserialize(&mut self, buf: &mut BytePacketBuffer) -> Result<()> {
+        self.deserialize_domain_name()?;
+        self.rrtype = buf.pop_u16()?.into();
+        self.rrclass = buf.pop_u16()?.into();
+        self.ttl = buf.pop_u32()?;
+        self.rrdata_len = buf.pop_u16()?;
+
+        self.rrdata = match self.rrtype {
+            RRType::A => {
+                let octets = buf.pop_u32()?;
+                let ip = Ipv4Addr::new(
+                    (octets & (0xFF << 24)) as u8,
+                    (octets & (0xFF << 16)) as u8,
+                    (octets & (0xFF << 8)) as u8,
+                    (octets & 0xFF) as u8,
+                );
+                RRData::A(ip)
+            }
+            RRType::Unknown(inner_val) => RRData::Unknown(inner_val),
+        };
+
+        Ok(())
+    }
+
+    fn deserialize_domain_name(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
+#[derive(Debug)]
 pub enum RRType {
     A,
     Unknown(u16),
@@ -274,6 +442,7 @@ impl From<RRType> for u16 {
     }
 }
 
+#[derive(Debug)]
 pub enum RRClass {
     IN,
     Unknown(u16),
@@ -295,4 +464,12 @@ impl From<RRClass> for u16 {
             RRClass::Unknown(inner_val) => inner_val,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum RRData {
+    A(Ipv4Addr),
+    // NOTE(tristan): Unknown RRData will only consist of the length of the data
+    // associated with the unknown-typed record.
+    Unknown(u16),
 }

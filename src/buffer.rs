@@ -4,12 +4,19 @@ use std::io::prelude::*;
 /// BytePacketBuffers currently have only a constant buffer size in bytes.
 pub const BUF_SIZE: usize = 512;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum BufferError {
+    IoError(std::io::Error),
     ReadOverrun,
 }
 
-type Result<T> = std::result::Result<T, BufferError>;
+impl From<std::io::Error> for BufferError {
+    fn from(err: std::io::Error) -> Self {
+        BufferError::IoError(err)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, BufferError>;
 
 pub struct BytePacketBuffer {
     buf: [u8; BUF_SIZE],
@@ -37,7 +44,7 @@ impl BytePacketBuffer {
 
     /// Fill a BytePacketBuffer starting at the beginning of the buffer with as much data
     /// from the input binary file as possible.
-    pub fn fill_from_file(&mut self, path: &str) -> std::io::Result<()> {
+    pub fn fill_from_file(&mut self, path: &str) -> Result<()> {
         let mut f = File::open(path)?;
         f.read(&mut self.buf)?;
         Ok(())
@@ -151,7 +158,8 @@ mod tests {
         let mut buf = BytePacketBuffer::new();
         buf.step(BUF_SIZE);
         assert_eq!(BUF_SIZE, buf.pos());
-        assert_eq!(Some(BufferError::ReadOverrun), buf.peek().err());
+        let _err = buf.peek().err();
+        assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 
     #[test]
@@ -171,7 +179,8 @@ mod tests {
         let mut buf = BytePacketBuffer::new();
         buf.seek(BUF_SIZE + 5);
         assert_eq!(BUF_SIZE + 5, buf.pos());
-        assert_eq!(Some(BufferError::ReadOverrun), buf.peek().err());
+        let _err = buf.peek().err();
+        assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 
     #[test]
@@ -185,10 +194,8 @@ mod tests {
     #[test]
     fn peek_range_err_buf_over() {
         let buf = BytePacketBuffer::new();
-        assert_eq!(
-            Some(BufferError::ReadOverrun),
-            buf.peek_range(BUF_SIZE - 5, 10).err()
-        );
+        let _err = buf.peek_range(BUF_SIZE - 5, 10).err();
+        assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 
     #[test]
@@ -205,7 +212,8 @@ mod tests {
     fn pop_err_buf_over() {
         let mut buf = BytePacketBuffer::new();
         buf.seek(BUF_SIZE);
-        assert_eq!(Some(BufferError::ReadOverrun), buf.pop().err());
+        let _err = buf.pop().err();
+        assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 
     #[test]
@@ -225,7 +233,8 @@ mod tests {
         let mut buf = BytePacketBuffer::new();
         buf.fill_from_slice(&bin[..]);
         buf.seek(BUF_SIZE - 1);
-        assert_eq!(Some(BufferError::ReadOverrun), buf.pop_u16().err());
+        let _err = buf.pop_u16().err();
+        assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 
     #[test]
@@ -245,6 +254,7 @@ mod tests {
         let mut buf = BytePacketBuffer::new();
         buf.fill_from_slice(&bin[..]);
         buf.seek(BUF_SIZE - 3);
-        assert_eq!(Some(BufferError::ReadOverrun), buf.pop_u32().err());
+        let _err = buf.pop_u32().err();
+        assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 }
