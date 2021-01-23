@@ -18,11 +18,11 @@ impl From<std::io::Error> for BufferError {
 
 pub type Result<T> = std::result::Result<T, BufferError>;
 
-pub trait Serialize {
+pub trait Serialize<'a> {
     type Buffer;
     type Structure;
 
-    fn serialize(s: &mut Self::Structure) -> Self::Buffer;
+    fn serialize(s: Self::Structure) -> Self::Buffer;
 }
 
 pub trait Deserialize {
@@ -33,7 +33,7 @@ pub trait Deserialize {
 }
 
 pub struct BytePacketBuffer {
-    buf: [u8; BUF_SIZE],
+    pub buf: [u8; BUF_SIZE],
     pos: usize,
 }
 
@@ -60,7 +60,7 @@ impl BytePacketBuffer {
     /// from the input binary file as possible.
     pub fn fill_from_file(&mut self, path: &str) -> Result<()> {
         let mut f = File::open(path)?;
-        f.read(&mut self.buf)?;
+        f.read_exact(&mut self.buf)?;
         Ok(())
     }
 
@@ -125,6 +125,12 @@ impl BytePacketBuffer {
             | (self.pop()? as u32);
 
         Ok(res)
+    }
+}
+
+impl Default for BytePacketBuffer {
+    fn default() -> Self {
+        BytePacketBuffer::new()
     }
 }
 

@@ -41,7 +41,7 @@ pub struct Header {
     op_code: OpCode,
     authoritative_answer: bool,
     truncation: bool,
-    recursion_desired: bool,
+    pub recursion_desired: bool,
     recursion_available: bool,
     authentic_data: bool,
     checking_disabled: bool,
@@ -70,6 +70,12 @@ impl Header {
             authority_count: 0,
             additional_count: 0,
         }
+    }
+}
+
+impl Default for Header {
+    fn default() -> Self {
+        Header::new()
     }
 }
 
@@ -134,7 +140,7 @@ impl From<u8> for OpCode {
 #[derive(Debug)]
 pub enum ResponseCode {
     NoError,
-    FormError,
+    FormatError,
     ServFail,
     NameError,
     NotImpl,
@@ -146,7 +152,7 @@ impl From<u8> for ResponseCode {
     fn from(val: u8) -> Self {
         match val {
             0 => ResponseCode::NoError,
-            1 => ResponseCode::FormError,
+            1 => ResponseCode::FormatError,
             2 => ResponseCode::ServFail,
             3 => ResponseCode::NameError,
             4 => ResponseCode::NotImpl,

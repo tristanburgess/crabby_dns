@@ -3,15 +3,58 @@ version: "0.1.0"
 author: Tristan Burgess <tburgessdev@gmail.com>
 about: Is a rusty DNS server
 subcommands:
-    - stub:
-        about: a simple DNS stub resolver. Can either forward DNS queries to a DNS server and parse + print the response, or read DNS packet data in binary encoded format from a file and parse + print the decoded DNS data.
+    - deserialize:
+        about: can deserialize supported types of DNS protocol datagram messages.
         version: "0.1.0"
         author: Tristan Burgess <tburgessdev@gmail.com>
         args:
-            - packet-file:
-                help: Path to a binary file containing DNS packet data.
-                long: packet-file
+            - message-file:
+                help: "Path to a binary file containing DNS message data."
+                long: "message-file"
                 required: true
-                short: f
+                short: 'f'
                 takes_value: true
                 value_name: FILE
+    - stub:
+        about: allows one to serialize a DNS question message and send over UDP to a DNS server, receive and deserialize the response message.
+        version: "0.1.0"
+        author: Tristan Burgess <tburgessdev@gmail.com>
+        args:
+            - server-name:
+                help: "The DNS server host name to which to send the question."
+                long: "server-name"
+                required: true
+                short: '@'
+                takes_value: true
+                value_name: SERVER_NAME
+            - server-port:
+                help: "The DNS server port to which to send the question.\n
+                    [default: 53]"
+                long: "server-port"
+                short: 'p'
+                takes_value: true
+                value_name: SERVER_PORT
+            - domain-name:
+                help: The domain name to send in the question.
+                long: "domain-name"
+                required: true
+                short: 'd'
+                takes_value: true
+                value_name: DOMAIN_NAME
+            - qtype:
+                help: "The 16 bit uint query type to send in the question.\n
+                    String-form (e.g. A) is not yet supported but will be someday.\n
+                    [default: 1 (A)]"
+                long: "query-type"
+                short: 't'
+                takes_value: true
+                value_name: QUERY_TYPE
+            - qclass:
+                help: "The 16 bit uint query class to send in the question.\n
+                    String-form (e.g. IN) is not yet supported but will be someday.\n
+                    [default: 1 (IN)]"
+                long: "query-class"
+                short: 'c'
+                takes_value: true
+                value_name: QUERY_CLASS
+    

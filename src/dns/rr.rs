@@ -47,13 +47,19 @@ pub struct ResourceRecord {
 impl ResourceRecord {
     pub fn new() -> ResourceRecord {
         ResourceRecord {
-            domain_name: DomainName::new(),
+            domain_name: DomainName::new(String::new()),
             rrtype: RRType::Unknown(0),
             rrclass: RRClass::Unknown(0),
             ttl: 0,
             rrdata_len: 0,
             rrdata: RRData::Unknown(0),
         }
+    }
+}
+
+impl Default for ResourceRecord {
+    fn default() -> Self {
+        ResourceRecord::new()
     }
 }
 

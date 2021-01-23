@@ -60,6 +60,26 @@ impl Message {
             additionals: Vec::new(),
         }
     }
+
+    pub fn push_question(&mut self, question: Question) {
+        self.questions.push(question);
+        self.header.question_count += 1;
+    }
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Message::new()
+    }
+}
+
+impl<'a> Serialize<'a> for Message {
+    type Buffer = &'a [u8];
+    type Structure = Self;
+
+    fn serialize(buf: Self::Structure) -> Self::Buffer {
+        &[0u8][..]
+    }
 }
 
 impl Deserialize for Message {

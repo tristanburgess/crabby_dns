@@ -41,8 +41,8 @@ pub struct DomainName(String);
 impl DomainName {
     const DSER_MAX_JUMPS: usize = 5;
 
-    pub fn new() -> DomainName {
-        DomainName(String::new())
+    pub fn new(raw_dn: String) -> DomainName {
+        DomainName(raw_dn)
     }
 }
 
@@ -51,7 +51,7 @@ impl Deserialize for DomainName {
     type Structure = Self;
 
     fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
-        let mut dn = DomainName::new();
+        let mut dn = DomainName::new(String::new());
         let mut jump_count: usize = 0;
         let starting_pos = buf.pos();
 
