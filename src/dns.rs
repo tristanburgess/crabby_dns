@@ -101,15 +101,6 @@ impl From<bool> for MessageType {
     }
 }
 
-impl From<MessageType> for bool {
-    fn from(val: MessageType) -> Self {
-        match val {
-            MessageType::Query => false,
-            MessageType::Response => true,
-        }
-    }
-}
-
 /// Representation of a DNS message header.
 ///
 /// [RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
@@ -226,15 +217,6 @@ impl From<u8> for OpCode {
     }
 }
 
-impl From<OpCode> for u8 {
-    fn from(val: OpCode) -> Self {
-        match val {
-            OpCode::Query => 0,
-            OpCode::Unknown(inner_val) => inner_val,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum ResponseCode {
     NoError,
@@ -256,20 +238,6 @@ impl From<u8> for ResponseCode {
             4 => ResponseCode::NotImpl,
             5 => ResponseCode::Refused,
             _ => ResponseCode::Unknown(val),
-        }
-    }
-}
-
-impl From<ResponseCode> for u8 {
-    fn from(val: ResponseCode) -> Self {
-        match val {
-            ResponseCode::NoError => 0,
-            ResponseCode::FormError => 1,
-            ResponseCode::ServFail => 2,
-            ResponseCode::NameError => 3,
-            ResponseCode::NotImpl => 4,
-            ResponseCode::Refused => 5,
-            ResponseCode::Unknown(inner_val) => inner_val,
         }
     }
 }
@@ -432,15 +400,6 @@ impl From<u16> for QueryType {
     }
 }
 
-impl From<QueryType> for u16 {
-    fn from(val: QueryType) -> Self {
-        match val {
-            QueryType::RRType(inner_val) => inner_val.into(),
-            QueryType::Unknown(inner_val) => inner_val,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum QueryClass {
     RRClass(RRClass),
@@ -456,15 +415,6 @@ impl From<u16> for QueryClass {
         match rrclass {
             RRClass::Unknown(inner_val) => QueryClass::Unknown(inner_val),
             _ => QueryClass::RRClass(rrclass),
-        }
-    }
-}
-
-impl From<QueryClass> for u16 {
-    fn from(val: QueryClass) -> Self {
-        match val {
-            QueryClass::RRClass(inner_val) => inner_val.into(),
-            QueryClass::Unknown(inner_val) => inner_val,
         }
     }
 }
@@ -568,15 +518,6 @@ impl From<u16> for RRType {
     }
 }
 
-impl From<RRType> for u16 {
-    fn from(val: RRType) -> Self {
-        match val {
-            RRType::A => 1,
-            RRType::Unknown(inner_val) => inner_val,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum RRClass {
     IN,
@@ -588,15 +529,6 @@ impl From<u16> for RRClass {
         match val {
             1 => RRClass::IN,
             _ => RRClass::Unknown(val),
-        }
-    }
-}
-
-impl From<RRClass> for u16 {
-    fn from(val: RRClass) -> Self {
-        match val {
-            RRClass::IN => 1,
-            RRClass::Unknown(inner_val) => inner_val,
         }
     }
 }
