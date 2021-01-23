@@ -1,0 +1,10 @@
+pub mod domain_name;
+pub use crate::dns::domain_name::DomainName;
+pub mod header;
+pub use crate::dns::header::{Header, MessageType, OpCode, ResponseCode};
+pub mod message;
+pub use crate::dns::message::Message;
+pub mod question;
+pub use crate::dns::question::{QueryClass, QueryType, Question};
+pub mod rr;
+pub use crate::dns::rr::{RRClass, RRData, RRType, ResourceRecord};
