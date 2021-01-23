@@ -18,6 +18,13 @@ impl From<std::io::Error> for BufferError {
 
 pub type Result<T> = std::result::Result<T, BufferError>;
 
+pub trait Serialize {
+    type Buffer;
+    type Structure;
+
+    fn serialize(s: &mut Self::Structure) -> Self::Buffer;
+}
+
 pub trait Deserialize {
     type Buffer;
     type Structure;
