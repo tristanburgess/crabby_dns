@@ -40,6 +40,18 @@ impl Question {
     }
 }
 
+impl Serialize for Question {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn serialize(question: Self::Structure, buf: &mut Self::Buffer) -> Result<()> {
+        DomainName::serialize(question.domain_name, buf)?;
+        buf.push_u16(question.qtype.into())?;
+        buf.push_u16(question.qclass.into())?;
+        Ok(())
+    }
+}
+
 impl Deserialize for Question {
     type Buffer = BytePacketBuffer;
     type Structure = Self;
@@ -56,6 +68,15 @@ impl Deserialize for Question {
 pub enum QueryType {
     RRType(RRType),
     Unknown(u16),
+}
+
+impl From<QueryType> for u16 {
+    fn from(val: QueryType) -> Self {
+        match val {
+            QueryType::RRType(inner_val) => inner_val.into(),
+            QueryType::Unknown(inner_val) => inner_val,
+        }
+    }
 }
 
 impl From<u16> for QueryType {
@@ -75,6 +96,15 @@ impl From<u16> for QueryType {
 pub enum QueryClass {
     RRClass(RRClass),
     Unknown(u16),
+}
+
+impl From<QueryClass> for u16 {
+    fn from(val: QueryClass) -> Self {
+        match val {
+            QueryClass::RRClass(inner_val) => inner_val.into(),
+            QueryClass::Unknown(inner_val) => inner_val,
+        }
+    }
 }
 
 impl From<u16> for QueryClass {

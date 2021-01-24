@@ -8,6 +8,7 @@ pub const BUF_SIZE: usize = 512;
 pub enum BufferError {
     IoError(std::io::Error),
     ReadOverrun,
+    WriteOverrun,
 }
 
 impl From<std::io::Error> for BufferError {
@@ -18,11 +19,11 @@ impl From<std::io::Error> for BufferError {
 
 pub type Result<T> = std::result::Result<T, BufferError>;
 
-pub trait Serialize<'a> {
+pub trait Serialize {
     type Buffer;
     type Structure;
 
-    fn serialize(s: Self::Structure) -> Self::Buffer;
+    fn serialize(struc: Self::Structure, buf: &mut Self::Buffer) -> Result<()>;
 }
 
 pub trait Deserialize {
@@ -58,9 +59,13 @@ impl BytePacketBuffer {
 
     /// Fill a BytePacketBuffer starting at the beginning of the buffer with as much data
     /// from the input binary file as possible.
+    // NOTE(tristan): this does not currently handle truncation, but for right now
+    // we don't expect to be working with any DNS datagrams larger than 512 bytes.
+    #[allow(clippy::unused_io_amount)]
     pub fn fill_from_file(&mut self, path: &str) -> Result<()> {
         let mut f = File::open(path)?;
-        f.read_exact(&mut self.buf)?;
+        f.read(&mut self.buf)?;
+
         Ok(())
     }
 
@@ -84,14 +89,16 @@ impl BytePacketBuffer {
         if self.pos >= BUF_SIZE {
             return Err(BufferError::ReadOverrun);
         }
+
         Ok(self.buf[self.pos])
     }
 
     /// Returns a byte slice of size `len` starting at byte `start` if the read won't overrun.
-    pub fn peek_range(&self, start: usize, len: usize) -> Result<&[u8]> {
+    pub fn peek_slice(&self, start: usize, len: usize) -> Result<&[u8]> {
         if start + len >= BUF_SIZE {
             return Err(BufferError::ReadOverrun);
         }
+
         Ok(&self.buf[start..start + len])
     }
 
@@ -101,8 +108,10 @@ impl BytePacketBuffer {
         if self.pos >= BUF_SIZE {
             return Err(BufferError::ReadOverrun);
         }
+
         let res = self.buf[self.pos];
         self.pos += 1;
+
         Ok(res)
     }
 
@@ -125,6 +134,45 @@ impl BytePacketBuffer {
             | (self.pop()? as u32);
 
         Ok(res)
+    }
+
+    pub fn push(&mut self, data: u8) -> Result<()> {
+        if self.pos >= BUF_SIZE {
+            return Err(BufferError::WriteOverrun);
+        }
+
+        self.buf[self.pos] = data;
+        self.pos += 1;
+
+        Ok(())
+    }
+
+    pub fn push_slice(&mut self, data: &[u8]) -> Result<()> {
+        if self.pos + data.len() >= BUF_SIZE {
+            return Err(BufferError::WriteOverrun);
+        }
+
+        for b in data {
+            self.push(*b)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn push_u16(&mut self, data: u16) -> Result<()> {
+        self.push(((data >> 8) & (0xFF)) as u8)?;
+        self.push((data & (0xFF)) as u8)?;
+
+        Ok(())
+    }
+
+    pub fn push_u32(&mut self, data: u32) -> Result<()> {
+        self.push(((data >> 24) & (0xFF)) as u8)?;
+        self.push(((data >> 16) & (0xFF)) as u8)?;
+        self.push(((data >> 8) & (0xFF)) as u8)?;
+        self.push((data & (0xFF)) as u8)?;
+
+        Ok(())
     }
 }
 
@@ -204,17 +252,17 @@ mod tests {
     }
 
     #[test]
-    fn peek_range_happy() {
+    fn peek_slice_happy() {
         let bin = b"supercooltest";
         let mut buf = BytePacketBuffer::new();
         buf.fill_from_slice(bin);
-        assert_eq!(b"cool"[..], *buf.peek_range(5, 4).unwrap());
+        assert_eq!(b"cool"[..], *buf.peek_slice(5, 4).unwrap());
     }
 
     #[test]
-    fn peek_range_err_buf_over() {
+    fn peek_slice_err_buf_over() {
         let buf = BytePacketBuffer::new();
-        let _err = buf.peek_range(BUF_SIZE - 5, 10).err();
+        let _err = buf.peek_slice(BUF_SIZE - 5, 10).err();
         assert!(matches!(Some(BufferError::ReadOverrun), _err));
     }
 

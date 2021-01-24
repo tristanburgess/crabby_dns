@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use crate::buffer::{BytePacketBuffer, Deserialize, Result, Serialize};
+use crate::buffer::{BytePacketBuffer, Deserialize, Result};
 use crate::dns::DomainName;
 
 /// Representation of a DNS resource record.
@@ -99,6 +99,15 @@ pub enum RRType {
     Unknown(u16),
 }
 
+impl From<RRType> for u16 {
+    fn from(val: RRType) -> Self {
+        match val {
+            RRType::A => 1,
+            RRType::Unknown(inner_val) => inner_val,
+        }
+    }
+}
+
 impl From<u16> for RRType {
     fn from(val: u16) -> Self {
         match val {
@@ -112,6 +121,15 @@ impl From<u16> for RRType {
 pub enum RRClass {
     IN,
     Unknown(u16),
+}
+
+impl From<RRClass> for u16 {
+    fn from(val: RRClass) -> Self {
+        match val {
+            RRClass::IN => 1,
+            RRClass::Unknown(inner_val) => inner_val,
+        }
+    }
 }
 
 impl From<u16> for RRClass {

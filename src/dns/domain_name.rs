@@ -46,6 +46,31 @@ impl DomainName {
     }
 }
 
+impl Serialize for DomainName {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn serialize(dn: Self::Structure, buf: &mut Self::Buffer) -> Result<()> {
+        if dn.0.len() + 1 > 255 {
+            todo!("How should this error be handled?");
+        }
+
+        for label in dn.0.split('.') {
+            let len = label.len();
+            if len > 63 {
+                todo!("How should this error be handled?");
+            }
+
+            buf.push(len as u8)?;
+            buf.push_slice(label.as_bytes())?;
+        }
+
+        buf.push(0)?;
+
+        Ok(())
+    }
+}
+
 impl Deserialize for DomainName {
     type Buffer = BytePacketBuffer;
     type Structure = Self;
@@ -71,7 +96,7 @@ impl Deserialize for DomainName {
                 let new_pos: u16 = ((len as u16) << 8 | buf.pop()? as u16) ^ 0xC000;
                 buf.seek(new_pos as usize);
             } else {
-                let label = buf.peek_range(buf.pos(), len as usize)?;
+                let label = buf.peek_slice(buf.pos(), len as usize)?;
                 dn.0.push_str(&String::from_utf8_lossy(label).to_lowercase());
                 buf.step(len as usize);
                 if buf.peek()? != 0 {

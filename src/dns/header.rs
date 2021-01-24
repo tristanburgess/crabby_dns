@@ -79,6 +79,34 @@ impl Default for Header {
     }
 }
 
+impl Serialize for Header {
+    type Buffer = BytePacketBuffer;
+    type Structure = Self;
+
+    fn serialize(hdr: Self::Structure, buf: &mut Self::Buffer) -> Result<()> {
+        buf.push_u16(hdr.id)?;
+
+        let mut flags: u16 = 0;
+        flags |= (bool::from(hdr.message_type) as u16) << 15;
+        flags |= (u8::from(hdr.op_code) as u16) << 11;
+        flags |= (hdr.authoritative_answer as u16) << 10;
+        flags |= (hdr.truncation as u16) << 9;
+        flags |= (hdr.recursion_desired as u16) << 8;
+        flags |= (hdr.recursion_available as u16) << 7;
+        flags |= (hdr.authentic_data as u16) << 5;
+        flags |= (hdr.checking_disabled as u16) << 4;
+        flags |= u8::from(hdr.response_code) as u16;
+        buf.push_u16(flags)?;
+
+        buf.push_u16(hdr.question_count)?;
+        buf.push_u16(hdr.answer_count)?;
+        buf.push_u16(hdr.authority_count)?;
+        buf.push_u16(hdr.additional_count)?;
+
+        Ok(())
+    }
+}
+
 impl Deserialize for Header {
     type Buffer = BytePacketBuffer;
     type Structure = Self;
@@ -113,6 +141,15 @@ pub enum MessageType {
     Response,
 }
 
+impl From<MessageType> for bool {
+    fn from(val: MessageType) -> Self {
+        match val {
+            MessageType::Query => false,
+            MessageType::Response => true,
+        }
+    }
+}
+
 impl From<bool> for MessageType {
     fn from(val: bool) -> Self {
         match val {
@@ -126,6 +163,15 @@ impl From<bool> for MessageType {
 pub enum OpCode {
     Query,
     Unknown(u8),
+}
+
+impl From<OpCode> for u8 {
+    fn from(val: OpCode) -> Self {
+        match val {
+            OpCode::Query => 0,
+            OpCode::Unknown(inner_val) => inner_val,
+        }
+    }
 }
 
 impl From<u8> for OpCode {
@@ -146,6 +192,20 @@ pub enum ResponseCode {
     NotImpl,
     Refused,
     Unknown(u8),
+}
+
+impl From<ResponseCode> for u8 {
+    fn from(val: ResponseCode) -> Self {
+        match val {
+            ResponseCode::NoError => 0,
+            ResponseCode::FormatError => 1,
+            ResponseCode::ServFail => 2,
+            ResponseCode::NameError => 3,
+            ResponseCode::NotImpl => 4,
+            ResponseCode::Refused => 5,
+            ResponseCode::Unknown(inner_val) => inner_val,
+        }
+    }
 }
 
 impl From<u8> for ResponseCode {

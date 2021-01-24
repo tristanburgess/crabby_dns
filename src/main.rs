@@ -8,11 +8,29 @@ use std::process;
 use rusty_dns_server::buffer::{BytePacketBuffer, Deserialize, Result, Serialize};
 use rusty_dns_server::dns::{DomainName, Message, Question};
 
+fn print_msg(msg: &Message) {
+    println!("{:#?}", msg.header);
+    for q in &msg.questions {
+        println!("{:#?}", q);
+    }
+    for a in &msg.answers {
+        println!("{:#?}", a);
+    }
+    for auth in &msg.authorities {
+        println!("{:#?}", auth);
+    }
+    for adtl in &msg.additionals {
+        println!("{:#?}", adtl);
+    }
+}
+
 fn deserialize_message_file(file_path: &str) -> Result<()> {
     let mut buf = BytePacketBuffer::new();
     buf.fill_from_file(file_path)?;
 
     let message = Message::deserialize(&mut buf)?;
+
+    println!("{:#>41}\n#\t\tDNS MESSAGE\t\t#\n{:#>41}", "#", "#");
     println!("{:#?}", message.header);
     for q in message.questions {
         println!("{:#?}", q);
@@ -32,33 +50,35 @@ fn deserialize_message_file(file_path: &str) -> Result<()> {
 
 fn stub_resolve(server_name: String, server_port: u16, question: Question) -> Result<()> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect(format!("{}:{}", server_name, server_port))?;
+    // TODO(tristan): this error should be better handled.
+    // It doesn't make sense to have it use ? and capture a BufferError
+    // as this socket is not part of our buffer management system.
+    let conn = format!("{}:{}", server_name, server_port);
+    socket.connect(&conn)?;
+    println!(
+        "Connected to {} from {}",
+        conn,
+        socket.local_addr().unwrap(),
+    );
+    println!("Working on the DNS transaction now...\n");
 
+    println!("{:#>49}\n#\t\tDNS QUESTION MESSAGE\t\t#\n{:#>49}", "#", "#");
     let mut qmsg = Message::new();
     qmsg.header.recursion_desired = true;
     qmsg.push_question(question);
+    print_msg(&qmsg);
+    println!();
 
     let mut send_buf = BytePacketBuffer::new();
-    send_buf.fill_from_slice(Message::serialize(qmsg));
+    Message::serialize(qmsg, &mut send_buf)?;
     socket.send(&send_buf.buf[..])?;
 
     let mut recv_buf = BytePacketBuffer::new();
     socket.recv(&mut recv_buf.buf[..])?;
 
+    println!("{:#>49}\n#\t\tDNS RESPONSE MESSAGE\t\t#\n{:#>49}", "#", "#");
     let rmsg = Message::deserialize(&mut recv_buf)?;
-    println!("{:#?}", rmsg.header);
-    for q in rmsg.questions {
-        println!("{:#?}", q);
-    }
-    for a in rmsg.answers {
-        println!("{:#?}", a);
-    }
-    for auth in rmsg.authorities {
-        println!("{:#?}", auth);
-    }
-    for adtl in rmsg.additionals {
-        println!("{:#?}", adtl);
-    }
+    print_msg(&rmsg);
 
     Ok(())
 }

@@ -73,12 +73,16 @@ impl Default for Message {
     }
 }
 
-impl<'a> Serialize<'a> for Message {
-    type Buffer = &'a [u8];
+impl<'a> Serialize for Message {
+    type Buffer = BytePacketBuffer;
     type Structure = Self;
 
-    fn serialize(buf: Self::Structure) -> Self::Buffer {
-        &[0u8][..]
+    fn serialize(msg: Self::Structure, buf: &mut Self::Buffer) -> Result<()> {
+        Header::serialize(msg.header, buf)?;
+        for question in msg.questions {
+            Question::serialize(question, buf)?;
+        }
+        Ok(())
     }
 }
 
