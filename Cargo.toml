@@ -3,7 +3,7 @@ authors = ["Tristan Burgess <tburgessdev@gmail.com>"]
 name = "crabby_dns"
 edition = "2018"
 readme = "README.md"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
