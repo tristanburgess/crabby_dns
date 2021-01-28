@@ -5,8 +5,8 @@ use clap::{App, AppSettings};
 use std::net::UdpSocket;
 use std::process;
 
-use rusty_dns_server::buffer::{BytePacketBuffer, Deserialize, Result, Serialize};
-use rusty_dns_server::dns::{DomainName, Message, Question};
+use crabby_dns::buffer::{BytePacketBuffer, Deserialize, Result, Serialize};
+use crabby_dns::dns::{DomainName, Message, Question};
 
 fn print_msg(msg: &Message) {
     println!("{:#?}", msg.header);

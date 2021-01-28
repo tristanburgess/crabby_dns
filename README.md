@@ -1,4 +1,4 @@
-# rusty_dns_server
+# Crabby DNS
 A simple DNS server in Rust to help contribute further understanding to my team's office hours discussions.
 
 I made significant reference to the following projects and/or documents in building this:
@@ -17,7 +17,7 @@ I made significant reference to the following projects and/or documents in build
 - The unit test suite can be run using `cargo test`
 - For actually running it, see what you can do with `cargo run -- --help` as well as the sections below.
 ## DNS Stub Resolver
-Right now the rusty_dns stub resolver implements some of the most basic relevant pieces of
+Right now the Crabby DNS stub resolver implements some of the most basic relevant pieces of
 [IETF RFC 1035](https://tools.ietf.org/html/rfc1035), and probably not even that correctly. 
 Only `A` RRs of class `IN` are currently supported.
 
@@ -117,7 +117,7 @@ ResourceRecord {
     - `nc -u 8.8.8.8 53 < query.pkt > response.pkt`
 - You can view the packet captures as hex if desired
     - `hexdump -C response.pkt`
-- Tying it all togetherm you can then invoke rusty_dns
+- Tying it all together you can then invoke Crabby DNS
     - `cargo run -- deserialize -f ./response.pkt`
 ### Example
 ```
