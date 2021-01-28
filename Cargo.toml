@@ -1,7 +1,10 @@
 [package]
 authors = ["Tristan Burgess <tburgessdev@gmail.com>"]
-name = "crabby_dns"
+description = "A DNS nameserver system intended to be a learning project both for myself and as an aide in teaching others more about DNS."
 edition = "2018"
+license = "MIT"
+license-file = "LICENSE.md"
+name = "crabby_dns"
 readme = "README.md"
 version = "0.1.0-alpha.2"
 
