@@ -86,6 +86,7 @@ impl Deserialize for ResourceRecord {
                 );
                 RRData::A(ip)
             }
+            RRType::CNAME => RRData::CNAME(DomainName::deserialize(buf)?),
             RRType::Unknown(_) => RRData::Unknown(rr.rrdata_len),
         };
 
@@ -96,6 +97,7 @@ impl Deserialize for ResourceRecord {
 #[derive(Debug)]
 pub enum RRType {
     A,
+    CNAME,
     Unknown(u16),
 }
 
@@ -103,6 +105,7 @@ impl From<RRType> for u16 {
     fn from(val: RRType) -> Self {
         match val {
             RRType::A => 1,
+            RRType::CNAME => 5,
             RRType::Unknown(inner_val) => inner_val,
         }
     }
@@ -112,6 +115,7 @@ impl From<u16> for RRType {
     fn from(val: u16) -> Self {
         match val {
             1 => RRType::A,
+            5 => RRType::CNAME,
             _ => RRType::Unknown(val),
         }
     }
@@ -166,6 +170,8 @@ pub enum RRData {
     /// "10.2.0.52" or "192.0.5.6").
     /// ```
     A(Ipv4Addr),
+
+    CNAME(DomainName),
 
     /// Unknown RRData will only consist of the length of the data
     /// associated with the unknown-typed resource record.

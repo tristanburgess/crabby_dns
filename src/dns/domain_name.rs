@@ -78,9 +78,15 @@ impl Deserialize for DomainName {
     fn deserialize(buf: &mut Self::Buffer) -> Result<Self::Structure> {
         let mut dn = DomainName::new(String::new());
         let mut jump_count: usize = 0;
-        let starting_pos = buf.pos();
+        // NOTE(tristan): The first jump begins a stack of potentially many further jumps,
+        // so remember the entry point and move past it at the end if there were any jumps.
+        // TODO(tristan): This has a bug if it is possible for two successive jumps at the root level
+        // where the first jump does not result in the null terminator. Is it possible? Do we need to be
+        // resillient against it anyways? Unit test it out with a constructed packet demonstrating the behavior.
+        let mut first_jump_pos = None;
 
         loop {
+            let cur_pos = buf.pos();
             let len = buf.pop()?;
 
             if len == 0 {
@@ -88,13 +94,16 @@ impl Deserialize for DomainName {
             }
 
             if (len & 0xC0) == 0xC0 {
+                if first_jump_pos == None {
+                    first_jump_pos = Some(cur_pos);
+                }
                 jump_count += 1;
                 if jump_count > Self::DSER_MAX_JUMPS {
                     // TODO(tristan) how is this error handled?
                     todo!();
                 }
-                let new_pos: u16 = ((len as u16) << 8 | buf.pop()? as u16) ^ 0xC000;
-                buf.seek(new_pos as usize);
+                let jump_pos: u16 = ((len as u16) << 8 | buf.pop()? as u16) ^ 0xC000;
+                buf.seek(jump_pos as usize);
             } else {
                 let label = buf.peek_slice(buf.pos(), len as usize)?;
                 dn.0.push_str(&String::from_utf8_lossy(label).to_lowercase());
@@ -105,8 +114,8 @@ impl Deserialize for DomainName {
             }
         }
 
-        if jump_count > 0 {
-            buf.seek(starting_pos + 2);
+        if let Some(pos) = first_jump_pos {
+            buf.seek(pos + 2);
         }
 
         Ok(dn)
